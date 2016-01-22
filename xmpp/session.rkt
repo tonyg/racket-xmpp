@@ -192,9 +192,9 @@
         [_ stanza])))
 
 (define (xmpp-send-iq* session to from id type body-elements)
-  (when (not id) (set! id (symbol->string (gensym 'iq))))
+  (when (not id) (set! id (gensym 'iq)))
   (xmpp-send session
-             `(iq ((id ,id)
+             `(iq ((id ,(symbol->string id))
                    ,@(maybe-elements to `(to ,(jid->string to)))
                    ,@(maybe-elements from `(from ,(jid->string from)))
                    (type ,type))
