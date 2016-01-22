@@ -4,7 +4,8 @@
 (provide read-stream-header
          read-stanza
          write-stream-header
-         write-stanza)
+         write-stanza
+         maybe-elements)
 
 (require racket/match)
 (require xml)
@@ -81,3 +82,6 @@
   (parameterize ((empty-tag-shorthand 'always))
     (write-xexpr stanza p))
   (when flush? (flush-output p)))
+
+(define-syntax-rule (maybe-elements test elt ...)
+  (if test (list elt ...) '()))
