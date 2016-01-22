@@ -21,6 +21,10 @@
          xmpp-receive
 
          xmpp-send-iq
+         xmpp-send-iq/get
+         xmpp-send-iq/set
+
+         xmpp-send-message
          )
 
 (struct xmpp-session (input
@@ -144,18 +148,16 @@
 (define (bind session)
   (when (member '(bind ((xmlns "urn:ietf:params:xml:ns:xmpp-bind")))
                 (xmpp-session-features session))
-    (xmpp-send-iq session
-                  `(bind ((xmlns "urn:ietf:params:xml:ns:xmpp-bind"))
-                         ,@(let ((resource (jid-resource (xmpp-session-jid session))))
-                             (if resource
-                                 `((resource ,resource))
-                                 '()))))
+    (xmpp-send-iq/set session
+                      `(bind ((xmlns "urn:ietf:params:xml:ns:xmpp-bind"))
+                             ,@(let ((resource (jid-resource (xmpp-session-jid session))))
+                                 (maybe-elements resource `(resource ,resource)))))
     (match (xmpp-receive session)
       [`(iq ,_ (bind ,_ (jid ,_ ,jidstr)))
        (set! session (struct-copy xmpp-session session [jid (string->jid jidstr)]))]))
   (when (member '(session ((xmlns "urn:ietf:params:xml:ns:xmpp-session")))
                 (xmpp-session-features session))
-    (xmpp-send-iq session `(session ((xmlns "urn:ietf:params:xml:ns:xmpp-session"))))
+    (xmpp-send-iq/set session `(session ((xmlns "urn:ietf:params:xml:ns:xmpp-session"))))
     (match (xmpp-receive session)
       [`(iq ,_) (void)]))
   session)
@@ -189,11 +191,37 @@
                                             #:stanza stanza)]
         [_ stanza])))
 
-(define (xmpp-send-iq session
-                      #:id [id #f]
-                      #:type [type "set"]
-                      . body-elements)
+(define (xmpp-send-iq* session to from id type body-elements)
   (when (not id) (set! id (symbol->string (gensym 'iq))))
   (xmpp-send session
-             `(iq ((id ,id) (type ,type)) ,@body-elements))
+             `(iq ((id ,id)
+                   ,@(maybe-elements to `(to ,(jid->string to)))
+                   ,@(maybe-elements from `(from ,(jid->string from)))
+                   (type ,type))
+                  ,@body-elements))
   id)
+
+(define (xmpp-send-iq session
+                      #:id [id #f]
+                      #:to [to #f]
+                      #:from [from #f]
+                      #:type [type "set"]
+                      . body-elements)
+  (xmpp-send-iq* session to from id type body-elements))
+
+(define (xmpp-send-iq/get session #:id [id #f] #:to [to #f] #:from [from #f] . body-elements)
+  (xmpp-send-iq* session to from id "get" body-elements))
+
+(define (xmpp-send-iq/set session #:id [id #f] #:to [to #f] #:from [from #f] . body-elements)
+  (xmpp-send-iq* session to from id "set" body-elements))
+
+(define (xmpp-send-message session
+                           #:to [to #f]
+                           #:from [from #f]
+                           #:type [type "chat"]
+                           . body-elements)
+  (xmpp-send session
+             `(message (,@(maybe-elements to `(to ,(jid->string to)))
+                        ,@(maybe-elements from `(from ,(jid->string from)))
+                        ,@(maybe-elements type `(type ,type)))
+                       ,@body-elements)))
