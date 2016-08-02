@@ -44,7 +44,7 @@
   (define (return-defaults)
     (values #f #f))
   (with-handlers [(exn:fail:contract? (lambda (e) (return-defaults)))]
-    (local-require net/dns)
+    (local-require (only-in net/dns dns-find-nameserver))
     (struct srv-rr (priority weight port target) #:prefab)
     (define dynamic:dns-get-srv (dynamic-require 'net/dns 'dns-get-srv))
     ;; ^ available in racket >= 6.3.0.7
