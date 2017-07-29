@@ -12,10 +12,12 @@
              resource) ;; may be #f
   #:prefab)
 
-(define (string->jid s)
+(define (string->jid s [on-error (lambda () (error 'string->jid "Ill-formed jid: ~v" s))])
   (match s
     [(regexp #px"^(([^@]+)@)?([^/]+)(/(.*))?$" (list _ _ u h _ r)) (jid u h r)]
-    [_ (error 'string->jid "Ill-formed jid: ~v" s)]))
+    [_ (if (procedure? on-error)
+           (on-error)
+           on-error)]))
 
 (define (jid->string j)
   (match-define (jid u h r) j)

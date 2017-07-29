@@ -18,12 +18,16 @@
 	 xmpp-flush
 
          xmpp-send
+         xmpp-receive-evt
          xmpp-receive
 
          xmpp-send-iq
          xmpp-send-iq/get
          xmpp-send-iq/set
+         xmpp-send-iq/result
+         xmpp-send-iq-reply
 
+         xmpp-send-presence
          xmpp-send-message
          )
 
@@ -159,10 +163,11 @@
                 (xmpp-session-features session))
     (xmpp-send-iq/set session `(session ((xmlns "urn:ietf:params:xml:ns:xmpp-session"))))
     (match (xmpp-receive session)
-      [`(iq ,_) (void)]))
+      [`(iq . ,_) (void)]))
   session)
 
 (define (xmpp-disconnect session)
+  (xmpp-flush session)
   (close-input-port (xmpp-session-input session))
   (close-output-port (xmpp-session-output session)))
 
@@ -172,15 +177,17 @@
 (define (xmpp-send session stanza #:flush? [flush? #t])
   (write-stanza (xmpp-session-output session) stanza #:flush? flush?))
 
+(define (xmpp-receive-evt session #:return-errors? [return-errors? #f])
+  (xmpp-flush session)
+  (handle-evt (xmpp-session-input session)
+              (lambda (_)
+                (maybe-raise-error return-errors?
+                                   (read-stanza (xmpp-session-input session))))))
+
 (define (xmpp-receive session
                       #:timeout [timeout #f]
                       #:return-errors? [return-errors? #f])
-  (xmpp-flush session)
-  (sync/timeout timeout
-                (handle-evt (xmpp-session-input session)
-                            (lambda (_)
-                              (maybe-raise-error return-errors?
-                                                 (read-stanza (xmpp-session-input session)))))))
+  (sync/timeout timeout (xmpp-receive-evt session #:return-errors? return-errors?)))
 
 (define (maybe-raise-error return-errors? stanza)
   (if return-errors?
@@ -194,7 +201,7 @@
 (define (xmpp-send-iq* session to from id type body-elements)
   (when (not id) (set! id (gensym 'iq)))
   (xmpp-send session
-             `(iq ((id ,(symbol->string id))
+             `(iq ((id ,(if (symbol? id) (symbol->string id) id))
                    ,@(maybe-elements to `(to ,(jid->string to)))
                    ,@(maybe-elements from `(from ,(jid->string from)))
                    (type ,type))
@@ -214,6 +221,36 @@
 
 (define (xmpp-send-iq/set session #:id [id #f] #:to [to #f] #:from [from #f] . body-elements)
   (xmpp-send-iq* session to from id "set" body-elements))
+
+(define (xmpp-send-iq/result session #:id [id #f] #:to [to #f] #:from [from #f] . body-elements)
+  (xmpp-send-iq* session to from id "result" body-elements))
+
+(define (xmpp-send-iq-reply session req-stanza . body-elements)
+  (match-define `(iq ,req-attrs . ,_) req-stanza)
+  (match-define `(to ,req-target) (assq 'to req-attrs))
+  (match-define `(from ,req-source) (assq 'from req-attrs))
+  (match-define `(id ,req-id) (assq 'id req-attrs))
+  (xmpp-send-iq* session
+                 (string->jid req-source)
+                 (string->jid req-target)
+                 req-id
+                 "result"
+                 body-elements))
+
+(define (xmpp-send-presence session
+                            #:to [to #f]
+                            #:from [from #f]
+                            #:type [type #f]
+                            #:show [show #f]
+                            #:status [status #f]
+                            . body-elements)
+  (xmpp-send session
+             `(presence (,@(maybe-elements to `(to ,(jid->string to)))
+                         ,@(maybe-elements from `(from ,(jid->string from)))
+                         ,@(maybe-elements type `(type ,type)))
+                        ,@(maybe-elements show `(show ,show))
+                        ,@(maybe-elements status `(status ,status))
+                        ,@body-elements)))
 
 (define (xmpp-send-message session
                            #:to [to #f]
