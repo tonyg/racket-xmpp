@@ -109,7 +109,9 @@
   (let ((features (restart-stream i o j)))
     (if (and (not encrypted?)
              use-tls?
-             (member '(starttls ((xmlns "urn:ietf:params:xml:ns:xmpp-tls"))) features))
+             (memf (match-lambda [`(starttls ((xmlns "urn:ietf:params:xml:ns:xmpp-tls")) ,_ ...) #t]
+                                 [_ #f])
+                   features))
         (let-values (((si so) (negotiate-tls i o)))
           (define pi si)
           ;; (define-values (pi po) (make-pipe))
@@ -125,9 +127,7 @@
   (write-stanza o '(starttls ((xmlns "urn:ietf:params:xml:ns:xmpp-tls"))) #:flush? #t)
   (match (read-stanza i)
     [`(failure ,_ ...) (xmpp-error "STARTTLS failure")]
-    [`(proceed ,_ ...) (ports->ssl-ports i o
-                                         #:close-original? #t
-                                         #:encrypt 'tls)]))
+    [`(proceed ,_ ...) (ports->ssl-ports i o #:mode 'connect #:close-original? #t)]))
 
 (define (authenticate i o encrypted? features j password)
   (when (not encrypted?)
