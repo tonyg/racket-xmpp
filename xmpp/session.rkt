@@ -150,8 +150,9 @@
      (bind s)]))
 
 (define (bind session)
-  (when (member '(bind ((xmlns "urn:ietf:params:xml:ns:xmpp-bind")))
-                (xmpp-session-features session))
+  (when (memf (match-lambda [`(bind ((xmlns "urn:ietf:params:xml:ns:xmpp-bind")) ,_ ...) #t]
+                            [_ #f])
+              (xmpp-session-features session))
     (xmpp-send-iq/set session
                       `(bind ((xmlns "urn:ietf:params:xml:ns:xmpp-bind"))
                              ,@(let ((resource (jid-resource (xmpp-session-jid session))))
