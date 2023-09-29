@@ -48,6 +48,7 @@
 (define (capture-until p terminator)
   (let loop ((acc-rev '()))
     (match (read-byte p)
+      [(? eof-object?) #f]
       [(== terminator) (list->bytes (reverse acc-rev))]
       [b (loop (cons b acc-rev))])))
 
