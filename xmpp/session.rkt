@@ -65,22 +65,13 @@
                       #:hostname [hostname #f]
                       #:ssl-port-number [ssl-port-number 5223]
                       #:port-number [port-number 5222])
+  (define (no-srv)
+    (xmpp-open-ssl-connection hostname ssl-port-number port-number use-tls? j password))
   (cond [use-srv?
          (match/values (lookup-srv (jid-host j))
-           [(#f #f) (xmpp-open-ssl-connection hostname
-                                              ssl-port-number
-                                              port-number
-                                              use-tls?
-                                              j
-                                              password)]
+           [(#f #f) (no-srv)]
            [(h p) (xmpp-open-tcp-connection h p use-tls? j password)])]
-        [else
-         (xmpp-open-ssl-connection hostname
-                                   ssl-port-number
-                                   port-number
-                                   use-tls?
-                                   j
-                                   password)]))
+        [else (no-srv)]))
 
 (define (xmpp-open-ssl-connection hostname ssl-port-number port-number use-tls? j password)
   (if (and use-tls? ssl-port-number)
