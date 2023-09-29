@@ -151,8 +151,9 @@
     (match (xmpp-receive session)
       [`(iq ,_ (bind ,_ (jid ,_ ,jidstr)))
        (set! session (struct-copy xmpp-session session [jid (string->jid jidstr)]))]))
-  (when (member '(session ((xmlns "urn:ietf:params:xml:ns:xmpp-session")))
-                (xmpp-session-features session))
+  (when (memf (match-lambda [`(session ((xmlns "urn:ietf:params:xml:ns:xmpp-session")) ,_ ...) #t]
+                            [_ #f])
+              (xmpp-session-features session))
     (xmpp-send-iq/set session `(session ((xmlns "urn:ietf:params:xml:ns:xmpp-session"))))
     (match (xmpp-receive session)
       [`(iq . ,_) (void)]))
